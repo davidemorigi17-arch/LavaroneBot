@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import date
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
@@ -6,6 +7,12 @@ from telegram.ext import (
     ConversationHandler, CallbackQueryHandler, MessageHandler, filters
 )
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 from database import init_db, add_booking, get_bookings, delete_booking, update_booking, get_booking_by_id
 from utils.dates import parse, overlap
@@ -381,6 +388,10 @@ async def modifica_handle_text(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Eccezione durante l'elaborazione dell'update:", exc_info=context.error)
+
+
 async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("start", "Avvia il bot"),
@@ -434,8 +445,9 @@ def main():
     app.add_handler(prenota_conv)
     app.add_handler(cancella_conv)
     app.add_handler(modifica_conv)
+    app.add_error_handler(error_handler)
 
-    app.run_polling()
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
