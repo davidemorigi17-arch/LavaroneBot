@@ -25,6 +25,15 @@ def check_conflict(start, end):
     return False, None
 
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🏡 Benvenuto nel bot prenotazioni!\n\n"
+        "Comandi disponibili:\n"
+        "/prenota GG-MM-AAAA GG-MM-AAAA Nome — Crea una prenotazione\n"
+        "/calendario — Visualizza tutte le prenotazioni"
+    )
+
+
 async def prenota(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
@@ -59,6 +68,7 @@ async def calendario(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
 
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("prenota", prenota))
     app.add_handler(CommandHandler("calendario", calendario))
 
