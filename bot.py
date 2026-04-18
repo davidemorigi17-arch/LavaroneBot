@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import date
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ForceReply
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
     ConversationHandler, CallbackQueryHandler, MessageHandler, filters
@@ -132,8 +132,11 @@ async def prenota_handle_end(update: Update, context: ContextTypes.DEFAULT_TYPE)
         selected = date.fromisoformat(parts[2])
         context.user_data["pren_end"] = selected
         await query.edit_message_text(
-            f"✅ Date: {start_date.strftime('%d/%m/%Y')} → {selected.strftime('%d/%m/%Y')}\n\n"
-            "👤 Inserisci il nome del prenotante:"
+            f"✅ Date selezionate: {start_date.strftime('%d/%m/%Y')} → {selected.strftime('%d/%m/%Y')}"
+        )
+        await query.message.reply_text(
+            "👤 Inserisci il nome del prenotante:",
+            reply_markup=ForceReply(selective=True)
         )
         return PRENOTA_NAME
     return PRENOTA_END
@@ -143,7 +146,8 @@ async def prenota_handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["pren_name"] = update.message.text.strip()
     await update.message.reply_text(
         "📝 Aggiungi una nota (es. chi andrà in casa, contatti, ecc.):\n"
-        "Oppure usa /salta per continuare senza nota."
+        "Oppure usa /salta per continuare senza nota.",
+        reply_markup=ForceReply(selective=True)
     )
     return PRENOTA_NOTES
 
@@ -304,10 +308,18 @@ async def modifica_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("📅 Seleziona la nuova data di inizio:", reply_markup=markup)
         return MODIFICA_START
     elif field == "name":
-        await query.edit_message_text("👤 Inserisci il nuovo nome:")
+        await query.edit_message_text("✏️ Modifica nome:")
+        await query.message.reply_text(
+            "👤 Inserisci il nuovo nome:",
+            reply_markup=ForceReply(selective=True)
+        )
         return MODIFICA_TEXT
     elif field == "notes":
-        await query.edit_message_text("📝 Inserisci la nuova nota (scrivi - per rimuoverla):")
+        await query.edit_message_text("✏️ Modifica nota:")
+        await query.message.reply_text(
+            "📝 Inserisci la nuova nota (scrivi - per rimuoverla):",
+            reply_markup=ForceReply(selective=True)
+        )
         return MODIFICA_TEXT
 
     return ConversationHandler.END
