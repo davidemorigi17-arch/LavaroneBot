@@ -1,0 +1,8 @@
+python-telegram-bot==21.6
+python-dotenv
+sqlite3
+google-api-python-client
+google-auth
+google-auth-oauthlib
+reportlab
+pandas
