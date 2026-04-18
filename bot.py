@@ -1,6 +1,7 @@
 import os
+import io
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ForceReply
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -85,6 +86,35 @@ async def annulla(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Operazione annullata.")
 
 
+# ─── iCal export ──────────────────────────────────────────────────────────────
+
+def generate_ics(bookings) -> bytes:
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//LavaroneBot//IT",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+    for b in bookings:
+        start = datetime.strptime(b[2], "%d-%m-%Y").date()
+        end = datetime.strptime(b[3], "%d-%m-%Y").date()
+        end_excl = end + timedelta(days=1)
+        description = (b[4] or "").replace("\n", "\\n").replace(",", "\\,")
+        summary = b[1].replace(",", "\\,")
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{b[0]}@lavaronebot",
+            f"SUMMARY:{summary}",
+            f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
+            f"DTEND;VALUE=DATE:{end_excl.strftime('%Y%m%d')}",
+            f"DESCRIPTION:{description}",
+            "END:VEVENT",
+        ]
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines).encode("utf-8")
+
+
 # ─── /calendario ──────────────────────────────────────────────────────────────
 
 async def calendario(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -98,7 +128,10 @@ async def calendario(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if b[4]:
             msg += f"\n   📝 {b[4]}"
         msg += "\n\n"
-    await update.message.reply_text(msg.strip())
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📥 Esporta calendario (.ics)", callback_data="cal_export")
+    ]])
+    await update.message.reply_text(msg.strip(), reply_markup=keyboard)
 
 
 # ─── /prenota ─────────────────────────────────────────────────────────────────
@@ -161,6 +194,22 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = get_state(ud)
 
     logger.info(f"CALLBACK: state={state} data={data}")
+
+    # ── Esporta calendario .ics ───────────────────────────────────────────────
+    if data == "cal_export":
+        bookings = get_bookings()
+        if not bookings:
+            await query.answer("Nessuna prenotazione da esportare.", show_alert=True)
+            return
+        ics_bytes = generate_ics(bookings)
+        ics_file = io.BytesIO(ics_bytes)
+        ics_file.name = "prenotazioni.ics"
+        await query.message.reply_document(
+            document=ics_file,
+            filename="prenotazioni.ics",
+            caption="📅 Importa questo file in Google Calendar, Apple Calendar o Outlook per vedere tutte le prenotazioni."
+        )
+        return
 
     # ── Prenota: start date calendar ──────────────────────────────────────────
     if data.startswith("ps|"):
