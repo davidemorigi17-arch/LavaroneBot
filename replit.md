@@ -1,31 +1,41 @@
-# Telegram Booking Bot
+# LavaroneBot — Telegram Booking Bot
 
-A Telegram bot for managing vacation home bookings. Users can create reservations, check for conflicts, and view the booking calendar through Telegram commands.
+Bot Telegram per la gestione delle prenotazioni di una casa vacanze. Interfaccia interattiva con tastiera inline, rilevamento conflitti, esportazione .ics.
 
 ## Tech Stack
 - **Language**: Python 3.12
-- **Bot Framework**: python-telegram-bot v21.6
-- **Database**: SQLite (stored at `data/bookings.db`)
-- **APIs**: Google Calendar (optional sync), ReportLab (PDF export)
+- **Bot Framework**: python-telegram-bot v21.6 (polling)
+- **Database**: SQLite (`data/bookings.db`)
 
 ## Project Structure
 ```
-bot.py             # Main entry point - Telegram bot handlers
-database.py        # SQLite CRUD operations (data/bookings.db)
-calendar_sync.py   # Google Calendar integration
-pdf_export.py      # PDF report generation
-utils/dates.py     # Date parsing and overlap detection
-data/              # SQLite database directory
+bot.py                    # Entry point — handler e state machine manuale
+database.py               # CRUD SQLite
+utils/calendar_keyboard.py  # Calendario inline con navigazione mesi
+utils/dates.py            # Parsing date e overlap detection
+data/bookings.db          # Database SQLite (auto-generato)
+requirements.txt
+.env.example
+README.md
 ```
 
 ## Bot Commands
-- `/prenota <start_date> <end_date> <name>` - Create a booking (dates in DD-MM-YYYY format)
-- `/calendario` - View all bookings
+- `/start` — Avvia il bot
+- `/prenota` — Crea prenotazione (calendario interattivo)
+- `/calendario` — Visualizza prenotazioni + export .ics
+- `/modifica` — Modifica date/nome/note di una prenotazione
+- `/cancella` — Cancella una prenotazione con conferma
+- `/annulla` — Annulla operazione in corso
+- `/salta` — Salta il campo note
 
 ## Configuration
-- `BOT_TOKEN` (secret) - Telegram bot token from @BotFather
-- `GOOGLE_CALENDAR_ID` (optional) - Google Calendar ID for sync
-- `GOOGLE_CREDENTIALS_FILE` (optional) - Path to Google credentials JSON
+- `BOT_TOKEN` (secret Replit) — Token del bot da @BotFather
 
 ## Running
-The bot runs as a console workflow with `python bot.py`. Start the "Start application" workflow after setting the BOT_TOKEN secret.
+Workflow `Start application` → `python bot.py`
+
+## Key Design Decisions
+- **State machine manuale** in `context.user_data` (no ConversationHandler) — necessario per funzionamento affidabile nei gruppi con PTB v21
+- **Polling** con `allowed_updates=Update.ALL_TYPES` — obbligatorio per ricevere callback inline nei gruppi
+- **Una sola istanza** alla volta — due istanze in polling causano Telegram Conflict error
+- Privacy Mode disabilitata via BotFather per funzionamento nei gruppi
