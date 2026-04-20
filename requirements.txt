@@ -1,7 +1,6 @@
 python-telegram-bot[webhooks]==21.6
 aiohttp
 python-dotenv
-sqlite3
 google-api-python-client
 google-auth
 google-auth-oauthlib
