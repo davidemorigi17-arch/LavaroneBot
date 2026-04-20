@@ -1,7 +1,9 @@
+import asyncio
 import os
 import io
 import logging
 from datetime import date, datetime, timedelta
+from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ForceReply
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -531,7 +533,45 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
 
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    webhook_url = os.getenv("WEBHOOK_URL")
+    if webhook_url:
+        port = int(os.getenv("PORT", 8080))
+
+        async def _run():
+            async with app:
+                await app.initialize()
+                await app.start()
+                await app.bot.set_webhook(
+                    url=f"{webhook_url}/webhook",
+                    allowed_updates=Update.ALL_TYPES,
+                )
+
+                async def _webhook(request):
+                    update = Update.de_json(await request.json(), app.bot)
+                    await app.update_queue.put(update)
+                    return web.Response()
+
+                async def _health(_request):
+                    return web.Response(text="ok")
+
+                aio_app = web.Application()
+                aio_app.router.add_post("/webhook", _webhook)
+                aio_app.router.add_get("/health", _health)
+
+                runner = web.AppRunner(aio_app)
+                await runner.setup()
+                await web.TCPSite(runner, "0.0.0.0", port).start()
+
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    await runner.cleanup()
+                    await app.stop()
+                    await app.shutdown()
+
+        asyncio.run(_run())
+    else:
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
