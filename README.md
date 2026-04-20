@@ -35,13 +35,16 @@ Bot Telegram per la gestione delle prenotazioni di una casa vacanze. Permette di
 
 ```
 LavaroneBot/
-├── bot.py                  # Entry point — handler Telegram e state machine
-├── database.py             # Operazioni CRUD su SQLite
+├── bot.py                    # Entry point — handler Telegram e state machine
+├── database.py               # Operazioni CRUD su SQLite
 ├── utils/
 │   ├── calendar_keyboard.py  # Costruzione tastiera calendario inline
 │   └── dates.py              # Parsing date e rilevamento sovrapposizioni
 ├── data/
-│   └── bookings.db         # Database SQLite (generato automaticamente)
+│   └── bookings.db           # Database SQLite (generato automaticamente)
+├── Dockerfile                # Immagine Docker per il bot
+├── docker-compose.yml        # Orchestrazione container
+├── update.sh                 # Script aggiornamento da GitHub
 ├── requirements.txt
 └── .env.example
 ```
@@ -100,6 +103,59 @@ Il progetto è configurato per girare su [Replit](https://replit.com) come VM se
 4. (Opzionale) Pubblica come **Deployment VM** per il funzionamento 24/7
 
 > Il bot usa il **polling** — contatta i server Telegram autonomamente ogni pochi secondi. Non richiede un indirizzo pubblico o webhook.
+
+---
+
+## Deploy con Docker Compose (server proprio)
+
+Questa è la modalità consigliata per far girare il bot su un tuo server (VPS, Raspberry Pi, NAS, ecc.) con **aggiornamento automatico da GitHub**.
+
+### Primo avvio
+
+```bash
+git clone https://github.com/davidemorigi17-arch/LavaroneBot.git
+cd LavaroneBot
+cp .env.example .env
+nano .env          # inserisci il BOT_TOKEN
+docker compose up -d --build
+```
+
+Il database SQLite viene salvato nella cartella `data/` sul host — persiste tra i riavvii del container.
+
+### Aggiornamento automatico
+
+Ogni volta che vuoi aggiornare il bot all'ultima versione dal repository GitHub, basta eseguire:
+
+```bash
+./update.sh
+```
+
+Lo script fa tre cose in sequenza:
+1. `git pull origin main` — scarica le ultime modifiche da GitHub
+2. `docker compose up -d --build` — ricostruisce l'immagine e riavvia il container
+3. Mostra lo stato del container
+
+### Aggiornamento completamente automatico (opzionale)
+
+Per aggiornare il bot senza nessun intervento manuale, aggiungi un cron job sul server:
+
+```bash
+crontab -e
+```
+
+```
+# Controlla aggiornamenti ogni ora
+0 * * * * cd /percorso/LavaroneBot && ./update.sh >> /var/log/lavaronebot-update.log 2>&1
+```
+
+### Comandi utili
+
+```bash
+docker compose logs -f          # Vedi i log in tempo reale
+docker compose ps               # Stato del container
+docker compose down             # Ferma il bot
+docker compose up -d --build    # Riavvia e aggiorna
+```
 
 ---
 

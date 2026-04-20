@@ -1,0 +1,10 @@
+services:
+  lavaronebot:
+    build: .
+    image: lavaronebot:latest
+    container_name: lavaronebot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
