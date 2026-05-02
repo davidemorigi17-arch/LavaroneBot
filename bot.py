@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 from database import init_db, add_booking, get_bookings, delete_booking, update_booking, get_booking_by_id
 from utils.dates import parse, overlap
-from utils.calendar_keyboard import build_calendar
+from utils.calendar_keyboard import build_calendar, build_month_summary
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -68,6 +68,11 @@ def booking_label(b):
     if b[4]:
         label += f" ({b[4]})"
     return label
+
+
+def cal_text(summary, prompt):
+    """Compone il testo del messaggio calendario: riepilogo + prompt."""
+    return f"{summary}{prompt}" if summary else prompt
 
 
 # ─── /start ───────────────────────────────────────────────────────────────────
@@ -146,8 +151,13 @@ async def prenota(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clear_state(context.user_data)
     set_state(context.user_data, "prenota_start")
     today = date.today()
-    markup = build_calendar(today.year, today.month, prefix="ps", bookings=get_bookings())
-    await update.message.reply_text("📅 Seleziona la data di inizio:", reply_markup=markup)
+    bk = get_bookings()
+    summary = build_month_summary(today.year, today.month, bk)
+    markup = build_calendar(today.year, today.month, prefix="ps", bookings=bk)
+    await update.message.reply_text(
+        cal_text(summary, "📅 Seleziona la data di inizio:"),
+        reply_markup=markup
+    )
 
 
 # ─── /cancella ────────────────────────────────────────────────────────────────
@@ -230,18 +240,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Prenotazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ps",
-                                    bookings=get_bookings())
-            await query.edit_message_reply_markup(markup)
+            y, m = int(parts[2]), int(parts[3])
+            bk = get_bookings()
+            summary = build_month_summary(y, m, bk)
+            markup = build_calendar(y, m, prefix="ps", bookings=bk)
+            await query.edit_message_text(
+                cal_text(summary, "📅 Seleziona la data di inizio:"),
+                reply_markup=markup
+            )
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
             ud["pren_start"] = selected
             set_state(ud, "prenota_end")
+            bk = get_bookings()
+            summary = build_month_summary(selected.year, selected.month, bk)
             markup = build_calendar(selected.year, selected.month, min_date=selected,
-                                    prefix="pe", bookings=get_bookings(), new_start=selected)
+                                    prefix="pe", bookings=bk, new_start=selected)
             await query.edit_message_text(
-                f"✅ Data inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la data di fine:",
+                cal_text(summary, f"✅ Inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la data di fine:"),
                 reply_markup=markup
             )
             return
@@ -260,9 +277,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Prenotazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date,
-                                    prefix="pe", bookings=get_bookings(), new_start=start_date)
-            await query.edit_message_reply_markup(markup)
+            y, m = int(parts[2]), int(parts[3])
+            bk = get_bookings()
+            summary = build_month_summary(y, m, bk)
+            markup = build_calendar(y, m, min_date=start_date, prefix="pe",
+                                    bookings=bk, new_start=start_date)
+            await query.edit_message_text(
+                cal_text(summary, f"✅ Inizio: {start_date.strftime('%d/%m/%Y')}\n\n📅 Seleziona la data di fine:"),
+                reply_markup=markup
+            )
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
@@ -362,9 +385,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if field == "dates":
             set_state(ud, "modifica_start")
             today = date.today()
-            markup = build_calendar(today.year, today.month, prefix="ms",
-                                    bookings=bookings_excluding(exclude_id))
-            await query.edit_message_text("📅 Seleziona la nuova data di inizio:", reply_markup=markup)
+            bk = bookings_excluding(exclude_id)
+            summary = build_month_summary(today.year, today.month, bk)
+            markup = build_calendar(today.year, today.month, prefix="ms", bookings=bk)
+            await query.edit_message_text(
+                cal_text(summary, "📅 Seleziona la nuova data di inizio:"),
+                reply_markup=markup
+            )
         elif field == "name":
             set_state(ud, "modifica_text")
             await query.edit_message_text("✏️ Modifica nome:")
@@ -395,19 +422,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Operazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ms",
-                                    bookings=bookings_excluding(exclude_id))
-            await query.edit_message_reply_markup(markup)
+            y, m = int(parts[2]), int(parts[3])
+            bk = bookings_excluding(exclude_id)
+            summary = build_month_summary(y, m, bk)
+            markup = build_calendar(y, m, prefix="ms", bookings=bk)
+            await query.edit_message_text(
+                cal_text(summary, "📅 Seleziona la nuova data di inizio:"),
+                reply_markup=markup
+            )
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
             ud["mod_new_start"] = selected
             set_state(ud, "modifica_end")
+            bk = bookings_excluding(exclude_id)
+            summary = build_month_summary(selected.year, selected.month, bk)
             markup = build_calendar(selected.year, selected.month, min_date=selected,
-                                    prefix="me", bookings=bookings_excluding(exclude_id),
-                                    new_start=selected)
+                                    prefix="me", bookings=bk, new_start=selected)
             await query.edit_message_text(
-                f"✅ Nuova data inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la nuova data di fine:",
+                cal_text(summary, f"✅ Inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la nuova data di fine:"),
                 reply_markup=markup
             )
             return
@@ -427,10 +460,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Operazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date,
-                                    prefix="me", bookings=bookings_excluding(exclude_id),
-                                    new_start=start_date)
-            await query.edit_message_reply_markup(markup)
+            y, m = int(parts[2]), int(parts[3])
+            bk = bookings_excluding(exclude_id)
+            summary = build_month_summary(y, m, bk)
+            markup = build_calendar(y, m, min_date=start_date, prefix="me",
+                                    bookings=bk, new_start=start_date)
+            await query.edit_message_text(
+                cal_text(summary, f"✅ Inizio: {start_date.strftime('%d/%m/%Y')}\n\n📅 Seleziona la nuova data di fine:"),
+                reply_markup=markup
+            )
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
