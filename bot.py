@@ -59,6 +59,10 @@ def check_conflict(start, end, exclude_id=None):
     return False, None
 
 
+def bookings_excluding(exclude_id):
+    return [b for b in get_bookings() if b[0] != exclude_id]
+
+
 def booking_label(b):
     label = f"{b[1]}: {b[2]} → {b[3]}"
     if b[4]:
@@ -142,7 +146,7 @@ async def prenota(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clear_state(context.user_data)
     set_state(context.user_data, "prenota_start")
     today = date.today()
-    markup = build_calendar(today.year, today.month, prefix="ps")
+    markup = build_calendar(today.year, today.month, prefix="ps", bookings=get_bookings())
     await update.message.reply_text("📅 Seleziona la data di inizio:", reply_markup=markup)
 
 
@@ -226,14 +230,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Prenotazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ps")
+            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ps",
+                                    bookings=get_bookings())
             await query.edit_message_reply_markup(markup)
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
             ud["pren_start"] = selected
             set_state(ud, "prenota_end")
-            markup = build_calendar(selected.year, selected.month, min_date=selected, prefix="pe")
+            markup = build_calendar(selected.year, selected.month, min_date=selected,
+                                    prefix="pe", bookings=get_bookings(), new_start=selected)
             await query.edit_message_text(
                 f"✅ Data inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la data di fine:",
                 reply_markup=markup
@@ -254,7 +260,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Prenotazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date, prefix="pe")
+            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date,
+                                    prefix="pe", bookings=get_bookings(), new_start=start_date)
             await query.edit_message_reply_markup(markup)
             return
         if action == "select":
@@ -351,10 +358,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Operazione annullata.")
             return
         ud["mod_field"] = field
+        exclude_id = ud.get("mod_id")
         if field == "dates":
             set_state(ud, "modifica_start")
             today = date.today()
-            markup = build_calendar(today.year, today.month, prefix="ms")
+            markup = build_calendar(today.year, today.month, prefix="ms",
+                                    bookings=bookings_excluding(exclude_id))
             await query.edit_message_text("📅 Seleziona la nuova data di inizio:", reply_markup=markup)
         elif field == "name":
             set_state(ud, "modifica_text")
@@ -378,6 +387,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         parts = data.split("|")
         action = parts[1]
+        exclude_id = ud.get("mod_id")
         if action == "ignore":
             return
         if action == "cancel":
@@ -385,14 +395,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Operazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ms")
+            markup = build_calendar(int(parts[2]), int(parts[3]), prefix="ms",
+                                    bookings=bookings_excluding(exclude_id))
             await query.edit_message_reply_markup(markup)
             return
         if action == "select":
             selected = date.fromisoformat(parts[2])
             ud["mod_new_start"] = selected
             set_state(ud, "modifica_end")
-            markup = build_calendar(selected.year, selected.month, min_date=selected, prefix="me")
+            markup = build_calendar(selected.year, selected.month, min_date=selected,
+                                    prefix="me", bookings=bookings_excluding(exclude_id),
+                                    new_start=selected)
             await query.edit_message_text(
                 f"✅ Nuova data inizio: {selected.strftime('%d/%m/%Y')}\n\n📅 Seleziona la nuova data di fine:",
                 reply_markup=markup
@@ -406,6 +419,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("|")
         action = parts[1]
         start_date = ud.get("mod_new_start")
+        exclude_id = ud.get("mod_id")
         if action == "ignore":
             return
         if action == "cancel":
@@ -413,7 +427,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Operazione annullata.")
             return
         if action in ("prev", "next"):
-            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date, prefix="me")
+            markup = build_calendar(int(parts[2]), int(parts[3]), min_date=start_date,
+                                    prefix="me", bookings=bookings_excluding(exclude_id),
+                                    new_start=start_date)
             await query.edit_message_reply_markup(markup)
             return
         if action == "select":
